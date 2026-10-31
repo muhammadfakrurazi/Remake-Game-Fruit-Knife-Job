@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Tebas Buah 3D Deluxe - Knife Edition</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;800&display=swap">
+  <!-- Three.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root {
+      --bg: #140a22;
+      --fg: #f3eefc;
+      box-sizing: border-box;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    [data-theme="light"] {
+      --bg: #f1e9f7;
+      --fg: #241046;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: 'Sora', system-ui, sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    .stage {
+      position: relative;
+      width: min(100%, calc((100dvh - 24px) * 400 / 560));
+      aspect-ratio: 400 / 560;
+      border-radius: 26px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+      background: #140a22;
+    }
+
+    #webgl-container {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      cursor: none; /* Sembunyikan kursor bawaan agar pisau 3D terlihat alami */
+    }
+
+    /* UI Glassmorphism Overlays */
+    #ov, #set {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      z-index: 10;
+    }
+
+    #set { padding: 16px; background: rgba(10, 4, 20, 0.65); backdrop-filter: blur(8px); }
+    #ov.hide, #set.hide { opacity: 0; pointer-events: none; transform: scale(0.95); }
+
+    .panel {
+      width: 100%;
+      max-width: 320px;
+      text-align: center;
+      color: #fff;
+      background: rgba(36, 16, 70, 0.72);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 24px;
+      padding: 24px 20px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+    }
+
+    #set .panel {
+      max-width: 340px;
+      max-height: 90%;
+      overflow-y: auto;
+      text-align: left;
+      background: rgba(28, 12, 56, 0.92);
+      padding: 20px 18px;
+    }
+
+    h2 { margin: 0 0 6px; font-size: 30px; font-weight: 800; letter-spacing: -0.02em; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    #set h2 { font-size: 22px; margin: 0 0 12px; text-align: center; }
+    p { margin: 0 0 16px; font-size: 13px; line-height: 1.5; color: #e4d8f5; }
+    #osc { font-size: 54px; font-weight: 800; line-height: 1; margin: 0 0 6px; color: #ffd54a; text-shadow: 0 4px 12px rgba(255,213,74,0.3); }
+
+    .mode-select {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 4px;
+      border-radius: 14px;
+    }
+
+    .mode-select button {
+      flex: 1;
+      padding: 8px 0;
+      border: 0;
+      border-radius: 10px;
+      background: none;
+      color: #d1c2eb;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mode-select button.active {
+      background: linear-gradient(135deg, #ff8a5c, #ff4d8d);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(255, 77, 141, 0.4);
+    }
+
+    button { font: inherit; cursor: pointer; border: 0; color: #fff; }
+    .btn-group-overlay {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+    }
+    #go, #close {
+      font-weight: 800;
+      font-size: 16px;
+      padding: 13px 40px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #ff8a5c, #ff4d8d);
+      box-shadow: 0 8px 22px rgba(255, 77, 141, 0.45);
+      transition: transform 0.15s, box-shadow 0.15s;
+      width: 100%;
+    }
+
+    .btn-sec {
+      font-weight: 700;
+      font-size: 14px;
+      padding: 10px 24px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      transition: background 0.2s;
+      width: 100%;
+    }
+    .btn-sec:active { background: rgba(255, 255, 255, 0.25); }
+
+    #go:active, #close:active { transform: scale(0.96); }
+
+    #gear {
+      position: absolute;
+      left: 50%;
+      bottom: 12px;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
+      z-index: 5;
+    }
+    #gear svg { width: 15px; height: 15px; }
+
+    /* Tombol Home In-Game */
+    #btn-home-ingame {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.35);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 6;
+      pointer-events: auto;
+      transition: transform 0.15s, background 0.2s;
+    }
+    #btn-home-ingame:active {
+      transform: scale(0.9);
+      background: rgba(255, 255, 255, 0.25);
+    }
+    #btn-home-ingame svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: #fff;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      padding: 11px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 13px;
+      font-weight: 600;
+      background: none;
+    }
+
+    .lbl { display: block; padding: 11px 0 6px; font-size: 13px; font-weight: 600; }
+    .sw i {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.22);
+      transition: background 0.2s;
+    }
+    .sw i::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s;
+    }
+    .sw[aria-checked="true"] i { background: linear-gradient(135deg, #ff8a5c, #ff4d8d); }
+    .sw[aria-checked="true"] i::after { transform: translateX(20px); }
+
+    .seg { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(255, 255, 255, 0.1); }
+    .seg button { flex: 1; padding: 7px 4px; border-radius: 8px; font-size: 12px; font-weight: 600; background: none; color: #e4d8f5; }
+    .seg button[aria-pressed="true"] { background: linear-gradient(135deg, #ff8a5c, #ff4d8d); color: #fff; }
+    .seg button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .hint { margin: 6px 0 0; font-size: 11px; color: #cdbfe6; line-height: 1.4; }
+    #rst { margin-top: 14px; width: 100%; padding: 11px; border-radius: 12px; font-size: 12px; font-weight: 600; background: rgba(255, 255, 255, 0.12); }
+    #rst.warn { background: #c2304f; }
+
+    #hud {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-left: 48px; /* Memberi ruang untuk tombol home */
+    }
+
+    .score-box {
+      color: #fff;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    }
+    .score-num { font-size: 42px; font-weight: 800; line-height: 1; }
+    .score-meta { font-size: 11px; font-weight: 600; opacity: 0.8; margin-top: 2px; }
+
+    .lives-box {
+      display: flex;
+      gap: 6px;
+      background: rgba(0,0,0,0.25);
+      padding: 6px 12px;
+      border-radius: 20px;
+      backdrop-filter: blur(6px);
+    }
+    .heart {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ff4d6d;
+      box-shadow: 0 0 8px #ff4d6d;
+      transition: all 0.3s;
+    }
+    .heart.lost {
+      background: rgba(255,255,255,0.2);
+      box-shadow: none;
+    }
+
+    .timer-box {
+      font-size: 26px;
+      font-weight: 800;
+      color: #fff;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+      background: rgba(0,0,0,0.25);
+      padding: 4px 14px;
+      border-radius: 16px;
+      backdrop-filter: blur(6px);
+    }
+
+    .combo-text {
+      position: absolute;
+      font-weight: 800;
+      font-size: 22px;
+      color: #ffd54a;
+      text-shadow: 0 0 10px rgba(255,213,74,0.8), 0 2px 4px #000;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      animation: floatUp 0.8s ease-out forwards;
+    }
+
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translate(-50%, -50%) scale(0.6); }
+      50% { transform: translate(-50%, -90%) scale(1.2); }
+      100% { opacity: 0; transform: translate(-50%, -130%) scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <div id="webgl-container"></div>
+
+    <!-- Tombol Home In-Game -->
+    <button id="btn-home-ingame" aria-label="Kembali ke Beranda" style="display: none;">
+      <svg viewBox="0 0 24 24">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+    </button>
+
+    <div id="hud">
+      <div class="hud-top">
+        <div class="score-box">
+          <div class="score-num" id="hud-score">0</div>
+          <div class="score-meta" id="hud-meta">Rekor 0 · NORMAL</div>
+        </div>
+        <div class="lives-box" id="hud-lives"></div>
+        <div class="timer-box" id="hud-timer" style="display:none;">60s</div>
+      </div>
+    </div>
+
+    <div id="ov">
+      <div class="panel">
+        <h2 id="ot">Tebas Buah 3D</h2>
+        <div id="osc"></div>
+        <p id="os">Potong buah 3D dengan pisau tajam! Hindari bom dan tebas power-up spesial!</p>
+        
+        <div class="mode-select" id="mode-select-group">
+          <button data-m="classic" class="active">Klasik</button>
+          <button data-m="zen">Zen 60s</button>
+          <button data-m="frenzy">Frenzy</button>
+        </div>
+
+        <div class="btn-group-overlay">
+          <button id="go">Main 3D</button>
+        </div>
+      </div>
+    </div>
+
+    <button id="gear" aria-label="Buka pengaturan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      Pengaturan
+    </button>
+
+    <div id="set" class="hide" role="dialog" aria-modal="true">
+      <div class="panel">
+        <h2>Pengaturan</h2>
+        <button class="row sw" id="t-snd" role="switch" aria-checked="true"><span>Suara Synth</span><i></i></button>
+        <button class="row sw" id="t-vib" role="switch" aria-checked="true"><span>Getaran Haptic</span><i></i></button>
+        <button class="row sw" id="t-shk" role="switch" aria-checked="true"><span>Guncangan Kamera 3D</span><i></i></button>
+        
+        <span class="lbl">Tingkat Kesulitan</span>
+        <div class="seg" id="s-diff">
+          <button data-v="easy">Mudah</button>
+          <button data-v="normal">Normal</button>
+          <button data-v="hard">Sulit</button>
+        </div>
+        <p class="hint" id="h-diff"></p>
+
+        <span class="lbl">Tema Tampilan</span>
+        <div class="seg" id="s-theme">
+          <button data-v="dark">Gelap</button>
+          <button data-v="light">Terang</button>
+        </div>
+
+        <button id="rst">Setel Ulang Rekor</button>
+        <button id="close">Lanjutkan</button>
+        <button id="btn-home-set" class="btn-sec" style="margin-top: 10px;">Ke Beranda</button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    /* ==========================================================================
+       1. GAME CONFIG & CONSTANTS
+       ========================================================================== */
+    const GAME_CONFIG = {
+      DIFF: {
+        easy: { n: 'Mudah', l: 5, b: 0.4, s: 1.2, h: '5 Nyawa, bom sangat sedikit, tempo lambat.' },
+        normal: { n: 'Normal', l: 3, b: 0.9, s: 1.0, h: '3 Nyawa, tempo standar.' },
+        hard: { n: 'Sulit', l: 3, b: 1.5, s: 0.8, h: '3 Nyawa, bom lebih sering, tempo tinggi.' }
+      },
+      FRUITS: [
+        { type: 'watermelon', name: 'Semangka', color: 0x2e7d32, innerColor: 0xff3d00, radius: 1.1 },
+        { type: 'orange',     name: 'Jeruk',     color: 0xff9800, innerColor: 0xffb74d, radius: 0.8 },
+        { type: 'apple',      name: 'Apel',      color: 0xd32f2f, innerColor: 0xfff9c4, radius: 0.85 },
+        { type: 'lime',       name: 'Jeruk Nipis',color:0x7cb342, innerColor: 0xc0ca33, radius: 0.75 },
+        { type: 'banana',     name: 'Pisang',    color: 0xffeb3b, innerColor: 0xfff59d, radius: 0.7 }
+      ],
+      POWERUPS: {
+        FREEZE: 'freeze',
+        DOUBLE: 'double',
+        FRENZY: 'frenzy'
+      }
+    };
+
+    /* ==========================================================================
+       2. PROCEDURAL TEXTURE GENERATOR
+       ========================================================================== */
+    const TEXTURES = {};
+
+    function generateProceduralTextures() {
+      // 1. Semangka Outer
+      const cvWm = document.createElement('canvas');
+      cvWm.width = cvWm.height = 512;
+      const ctxWm = cvWm.getContext('2d');
+      ctxWm.fillStyle = '#1b5e20';
+      ctxWm.fillRect(0, 0, 512, 512);
+      ctxWm.fillStyle = '#4caf50';
+      for (let i = 0; i < 512; i += 40) {
+        ctxWm.beginPath();
+        ctxWm.moveTo(i, 0);
+        ctxWm.bezierCurveTo(i + 20, 150, i - 20, 350, i + 10, 512);
+        ctxWm.lineTo(i + 30, 512);
+        ctxWm.bezierCurveTo(i, 350, i + 40, 150, i + 20, 0);
+        ctxWm.fill();
+      }
+      TEXTURES.watermelonRind = new THREE.CanvasTexture(cvWm);
+
+      // 2. Semangka Cut Face
+      const cvWmInner = document.createElement('canvas');
+      cvWmInner.width = cvWmInner.height = 512;
+      const ctxWmIn = cvWmInner.getContext('2d');
+      ctxWmIn.fillStyle = '#1b5e20';
+      ctxWmIn.beginPath(); ctxWmIn.arc(256, 256, 256, 0, Math.PI * 2); ctxWmIn.fill();
+      ctxWmIn.fillStyle = '#ffffff';
+      ctxWmIn.beginPath(); ctxWmIn.arc(256, 256, 240, 0, Math.PI * 2); ctxWmIn.fill();
+      ctxWmIn.fillStyle = '#ff3d00';
+      ctxWmIn.beginPath(); ctxWmIn.arc(256, 256, 225, 0, Math.PI * 2); ctxWmIn.fill();
+      ctxWmIn.fillStyle = '#212121';
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
+        const sx = 256 + Math.cos(a) * 140;
+        const sy = 256 + Math.sin(a) * 140;
+        ctxWmIn.beginPath();
+        ctxWmIn.ellipse(sx, sy, 8, 14, a, 0, Math.PI * 2);
+        ctxWmIn.fill();
+      }
+      TEXTURES.watermelonCut = new THREE.CanvasTexture(cvWmInner);
+
+      // 3. Citrus Cut Face
+      function makeCitrusCut(outerColor, pulpColor) {
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = 512;
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = outerColor;
+        ctx.beginPath(); ctx.arc(256, 256, 256, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(256, 256, 242, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = pulpColor;
+        const segs = 10;
+        for (let i = 0; i < segs; i++) {
+          const a1 = (i / segs) * Math.PI * 2 + 0.05;
+          const a2 = ((i + 1) / segs) * Math.PI * 2 - 0.05;
+          ctx.beginPath();
+          ctx.moveTo(256 + Math.cos(a1) * 25, 256 + Math.sin(a1) * 25);
+          ctx.arc(256, 256, 228, a1, a2);
+          ctx.closePath();
+          ctx.fill();
+        }
+        return new THREE.CanvasTexture(cv);
+      }
+      TEXTURES.orangeCut = makeCitrusCut('#e65100', '#ff9800');
+      TEXTURES.limeCut = makeCitrusCut('#33691e', '#7cb342');
+
+      // 4. Apple Cut Face
+      const cvApple = document.createElement('canvas');
+      cvApple.width = cvApple.height = 512;
+      const ctxAp = cvApple.getContext('2d');
+      ctxAp.fillStyle = '#d32f2f';
+      ctxAp.beginPath(); ctxAp.arc(256, 256, 256, 0, Math.PI * 2); ctxAp.fill();
+      ctxAp.fillStyle = '#fffde7';
+      ctxAp.beginPath(); ctxAp.arc(256, 256, 244, 0, Math.PI * 2); ctxAp.fill();
+      ctxAp.fillStyle = '#5d4037';
+      ctxAp.beginPath(); ctxAp.ellipse(240, 256, 10, 18, -0.3, 0, Math.PI * 2); ctxAp.fill();
+      ctxAp.beginPath(); ctxAp.ellipse(272, 256, 10, 18, 0.3, 0, Math.PI * 2); ctxAp.fill();
+      TEXTURES.appleCut = new THREE.CanvasTexture(cvApple);
+    }
+
+    /* ==========================================================================
+       3. AUDIO MANAGER
+       ========================================================================== */
+    class AudioManager {
+      constructor() { this.ctx = null; }
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+      }
+
+      play(type, enabled = true) {
+        if (!enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const t0 = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        const rand = (a, b) => a + Math.random() * (b - a);
+
+        if (type === 'slice') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(rand(900, 1400), t0);
+          osc.frequency.exponentialRampToValueAtTime(150, t0 + 0.1);
+          gain.gain.setValueAtTime(0.2, t0);
+          gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.12);
+          osc.start(t0); osc.stop(t0 + 0.13);
+        } else if (type === 'bomb') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(200, t0);
+          osc.frequency.exponentialRampToValueAtTime(25, t0 + 0.6);
+          gain.gain.setValueAtTime(0.35, t0);
+          gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.65);
+          osc.start(t0); osc.stop(t0 + 0.7);
+        } else if (type === 'powerup') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(350, t0);
+          osc.frequency.exponentialRampToValueAtTime(950, t0 + 0.3);
+          gain.gain.setValueAtTime(0.2, t0);
+          gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.32);
+          osc.start(t0); osc.stop(t0 + 0.35);
+        } else if (type === 'miss') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(280, t0);
+          osc.frequency.exponentialRampToValueAtTime(140, t0 + 0.2);
+          gain.gain.setValueAtTime(0.12, t0);
+          gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.22);
+          osc.start(t0); osc.stop(t0 + 0.24);
+        }
+      }
+    }
+    const audioMgr = new AudioManager();
+
+    /* ==========================================================================
+       4. STORAGE MANAGER
+       ========================================================================== */
+    class StorageManager {
+      constructor() {
+        this.settings = { snd: true, vib: true, shk: true, diff: 'normal', theme: 'dark', mode: 'classic' };
+        this.loadSettings();
+      }
+      loadSettings() {
+        try {
+          const data = JSON.parse(localStorage.getItem('tebas3d-set') || '{}');
+          Object.assign(this.settings, data);
+        } catch (e) {}
+      }
+      saveSettings() {
+        try { localStorage.setItem('tebas3d-set', JSON.stringify(this.settings)); } catch (e) {}
+      }
+      getBestKey() { return `tebas3d-best-${this.settings.mode}-${this.settings.diff}`; }
+      getBestScore() { try { return +localStorage.getItem(this.getBestKey()) || 0; } catch (e) { return 0; } }
+      setBestScore(s) { try { localStorage.setItem(this.getBestKey(), s); } catch (e) {} }
+      clearBestScore() { try { localStorage.removeItem(this.getBestKey()); } catch (e) {} }
+    }
+    const store = new StorageManager();
+
+    /* ==========================================================================
+       5. THREE.JS 3D ENGINE & KNIFE MODEL SETUP
+       ========================================================================== */
+    const container = document.getElementById('webgl-container');
+    let scene, camera, renderer;
+    let ambientLight, dirLight, pointLight;
+    
+    let activeObjects = [];  
+    let slicedHalves = [];   
+    let particles = [];      
+    let bladeTrailPoints = [];
+
+    let bladeMesh;
+    let knifeGroup; // Model Pisau 3D
+    const MAX_TRAIL = 18;
+
+    function init3D() {
+      generateProceduralTextures();
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x140a22);
+
+      camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+      camera.position.set(0, 0, 14);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+      scene.add(ambientLight);
+
+      dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+      dirLight.position.set(5, 12, 10);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 1024;
+      dirLight.shadow.mapSize.height = 1024;
+      scene.add(dirLight);
+
+      pointLight = new THREE.PointLight(0xff77a9, 0.5, 15);
+      pointLight.position.set(-5, -5, 5);
+      scene.add(pointLight);
+
+      create3DKnife();
+      createBladeRibbon();
+
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    function onWindowResize() {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+
+    /* ==========================================================================
+       6. 3D KNIFE WEAPON GENERATOR
+       ========================================================================== */
+    function create3DKnife() {
+      knifeGroup = new THREE.Group();
+
+      // 1. Mata Pisau (Steel Blade)
+      const bladeShape = new THREE.Shape();
+      bladeShape.moveTo(0, 0);
+      bladeShape.lineTo(0.18, 0.8);
+      bladeShape.quadraticCurveTo(0.12, 2.0, 0, 2.5);
+      bladeShape.lineTo(-0.08, 0.8);
+      bladeShape.lineTo(-0.08, 0);
+      bladeShape.closePath();
+
+      const extrudeSettings = { depth: 0.03, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.02, bevelThickness: 0.02 };
+      const bladeGeom = new THREE.ExtrudeGeometry(bladeShape, extrudeSettings);
+      const bladeMat = new THREE.MeshStandardMaterial({
+        color: 0xdddddd,
+        metalness: 0.95,
+        roughness: 0.15
+      });
+      const bladeMeshObj = new THREE.Mesh(bladeGeom, bladeMat);
+      bladeMeshObj.castShadow = true;
+      knifeGroup.add(bladeMeshObj);
+
+      // 2. Gagang Pisau (Wooden Handle)
+      const handleGeom = new THREE.BoxGeometry(0.2, 0.9, 0.12);
+      const handleMat = new THREE.MeshStandardMaterial({
+        color: 0x5c3a21,
+        roughness: 0.7
+      });
+      const handleMesh = new THREE.Mesh(handleGeom, handleMat);
+      handleMesh.position.set(0.04, -0.45, 0.015);
+      handleMesh.castShadow = true;
+      knifeGroup.add(handleMesh);
+
+      // 3. Pasak Penahan Gagang (Rivets)
+      const rivetGeom = new THREE.CylinderGeometry(0.03, 0.03, 0.14, 8);
+      const rivetMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.9, roughness: 0.2 });
+      
+      const rivet1 = new THREE.Mesh(rivetGeom, rivetMat);
+      rivet1.rotation.x = Math.PI / 2;
+      rivet1.position.set(0.04, -0.25, 0.015);
+      knifeGroup.add(rivet1);
+
+      const rivet2 = rivet1.clone();
+      rivet2.position.set(0.04, -0.65, 0.015);
+      knifeGroup.add(rivet2);
+
+      knifeGroup.position.set(0, 0, 2);
+      knifeGroup.scale.set(0.85, 0.85, 0.85);
+      scene.add(knifeGroup);
+    }
+
+    /* ==========================================================================
+       7. BUAH & PARTIKEL 3D
+       ========================================================================== */
+    function createFruitMesh(fruitDef) {
+      const group = new THREE.Group();
+      let geom, mat;
+
+      if (fruitDef.type === 'watermelon') {
+        geom = new THREE.SphereGeometry(fruitDef.radius, 32, 24);
+        geom.scale(1.2, 1.0, 1.0);
+        mat = new THREE.MeshStandardMaterial({ map: TEXTURES.watermelonRind, roughness: 0.35 });
+      } else if (fruitDef.type === 'orange') {
+        geom = new THREE.SphereGeometry(fruitDef.radius, 24, 24);
+        mat = new THREE.MeshStandardMaterial({ color: fruitDef.color, roughness: 0.4 });
+      } else if (fruitDef.type === 'apple') {
+        geom = new THREE.SphereGeometry(fruitDef.radius, 24, 24);
+        const pos = geom.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          let y = pos.getY(i);
+          if (y > 0) pos.setY(i, y * 0.88);
+        }
+        geom.computeVertexNormals();
+        mat = new THREE.MeshStandardMaterial({ color: fruitDef.color, roughness: 0.2, metalness: 0.1 });
+        
+        const stemGeom = new THREE.CylinderGeometry(0.03, 0.04, 0.4, 8);
+        const stemMat = new THREE.MeshStandardMaterial({ color: 0x4a2e12 });
+        const stem = new THREE.Mesh(stemGeom, stemMat);
+        stem.position.y = fruitDef.radius * 0.85;
+        group.add(stem);
+      } else if (fruitDef.type === 'lime') {
+        geom = new THREE.SphereGeometry(fruitDef.radius, 24, 24);
+        geom.scale(1.1, 0.95, 0.95);
+        mat = new THREE.MeshStandardMaterial({ color: fruitDef.color, roughness: 0.3 });
+      } else if (fruitDef.type === 'banana') {
+        geom = new THREE.CylinderGeometry(0.18, 0.22, 2.2, 12, 12);
+        const pos = geom.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          let y = pos.getY(i);
+          let z = pos.getZ(i);
+          pos.setZ(i, z + Math.sin((y + 1.1) / 2.2 * Math.PI) * 0.4);
+        }
+        geom.computeVertexNormals();
+        mat = new THREE.MeshStandardMaterial({ color: fruitDef.color, roughness: 0.4 });
+      }
+
+      const mainMesh = new THREE.Mesh(geom, mat);
+      mainMesh.castShadow = true;
+      mainMesh.receiveShadow = true;
+      group.add(mainMesh);
+
+      group.userData = { radius: fruitDef.radius, fruitDef: fruitDef, type: 'fruit' };
+      return group;
+    }
+
+    function createFruitHalfMesh(fruitDef, side) {
+      const group = new THREE.Group();
+      const r = fruitDef.radius;
+
+      const halfGeom = new THREE.SphereGeometry(r, 24, 24, 0, Math.PI * 2, 0, Math.PI / 2);
+      let outerMat = new THREE.MeshStandardMaterial({ color: fruitDef.color, roughness: 0.4 });
+      if (fruitDef.type === 'watermelon') outerMat.map = TEXTURES.watermelonRind;
+
+      const shell = new THREE.Mesh(halfGeom, outerMat);
+
+      const capGeom = new THREE.CircleGeometry(r, 24);
+      let cutTexture = null;
+      if (fruitDef.type === 'watermelon') cutTexture = TEXTURES.watermelonCut;
+      else if (fruitDef.type === 'orange') cutTexture = TEXTURES.orangeCut;
+      else if (fruitDef.type === 'lime') cutTexture = TEXTURES.limeCut;
+      else if (fruitDef.type === 'apple') cutTexture = TEXTURES.appleCut;
+
+      const innerMat = new THREE.MeshStandardMaterial({
+        color: cutTexture ? 0xffffff : fruitDef.innerColor,
+        map: cutTexture,
+        roughness: 0.5,
+        side: THREE.DoubleSide
+      });
+      const cap = new THREE.Mesh(capGeom, innerMat);
+      cap.rotation.x = Math.PI / 2;
+
+      group.add(shell);
+      group.add(cap);
+
+      if (side === 'left') group.rotation.z = Math.PI / 2;
+      else group.rotation.z = -Math.PI / 2;
+
+      return group;
+    }
+
+    function createBombMesh() {
+      const group = new THREE.Group();
+      const bodyGeom = new THREE.SphereGeometry(0.85, 24, 24);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.2, metalness: 0.85 });
+      const body = new THREE.Mesh(bodyGeom, bodyMat);
+      body.castShadow = true;
+      group.add(body);
+
+      const capGeom = new THREE.CylinderGeometry(0.2, 0.2, 0.2, 12);
+      const capMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.9 });
+      const cap = new THREE.Mesh(capGeom, capMat);
+      cap.position.y = 0.85;
+      group.add(cap);
+
+      const fuseGeom = new THREE.CylinderGeometry(0.04, 0.04, 0.4, 8);
+      const fuseMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63 });
+      const fuse = new THREE.Mesh(fuseGeom, fuseMat);
+      fuse.position.set(0.1, 1.05, 0);
+      fuse.rotation.z = -0.3;
+      group.add(fuse);
+
+      const sparkGeom = new THREE.SphereGeometry(0.12, 8, 8);
+      const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffeb3b });
+      const spark = new THREE.Mesh(sparkGeom, sparkMat);
+      spark.position.set(0.2, 1.2, 0);
+      group.add(spark);
+
+      group.userData = { radius: 0.85, type: 'bomb' };
+      return group;
+    }
+
+    function createPowerUpMesh(powerType) {
+      const group = new THREE.Group();
+      let geom, mat;
+
+      if (powerType === GAME_CONFIG.POWERUPS.FREEZE) {
+        geom = new THREE.IcosahedronGeometry(0.75, 0);
+        mat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.85 });
+      } else if (powerType === GAME_CONFIG.POWERUPS.DOUBLE) {
+        geom = new THREE.OctahedronGeometry(0.8, 0);
+        mat = new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.2, metalness: 0.9 });
+      } else { 
+        geom = new THREE.DodecahedronGeometry(0.8, 0);
+        mat = new THREE.MeshStandardMaterial({ color: 0xff1744, roughness: 0.2, metalness: 0.5 });
+      }
+
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.castShadow = true;
+      group.add(mesh);
+
+      group.userData = { radius: 0.8, type: 'powerup', powerType: powerType };
+      return group;
+    }
+
+    function createBladeRibbon() {
+      const geom = new THREE.BufferGeometry();
+      const positions = new Float32Array(MAX_TRAIL * 3 * 2);
+      geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending
+      });
+
+      bladeMesh = new THREE.Mesh(geom, mat);
+      scene.add(bladeMesh);
+    }
+
+    function updateBladeMesh() {
+      if (bladeTrailPoints.length < 2) {
+        bladeMesh.visible = false;
+        return;
+      }
+      bladeMesh.visible = true;
+
+      const positions = bladeMesh.geometry.attributes.position.array;
+      const count = bladeTrailPoints.length;
+
+      for (let i = 0; i < count; i++) {
+        const p = bladeTrailPoints[i];
+        const width = (i / count) * 0.18;
+
+        positions[i * 6 + 0] = p.x;
+        positions[i * 6 + 1] = p.y + width;
+        positions[i * 6 + 2] = p.z;
+
+        positions[i * 6 + 3] = p.x;
+        positions[i * 6 + 4] = p.y - width;
+        positions[i * 6 + 5] = p.z;
+      }
+
+      bladeMesh.geometry.attributes.position.needsUpdate = true;
+      bladeMesh.geometry.setDrawRange(0, count * 2);
+    }
+
+    function spawnParticles(pos, colorHex, count = 18) {
+      for (let i = 0; i < count; i++) {
+        const geom = new THREE.SphereGeometry(R(0.05, 0.12), 6, 6);
+        const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+        const p = new THREE.Mesh(geom, mat);
+        p.position.copy(pos);
+
+        const vel = new THREE.Vector3(R(-6, 6), R(-4, 8), R(-4, 4));
+        particles.push({ mesh: p, vel: vel, life: 1.0 });
+        scene.add(p);
+      }
+    }
+
+    /* ==========================================================================
+       8. GAME STATE & MECHANICS
+       ========================================================================== */
+    let gameState = 'menu';
+    let score = 0, bestScore = 0, lives = 3, maxLives = 3;
+    let gameTime = 0, spawnTimer = 0, comboHits = 0;
+    let zenTimer = 60, freezeTimer = 0, doubleTimer = 0, frenzyTimer = 0;
+    let isPointerDown = false;
+    let lastRayPos = null;
+
+    const raycaster = new THREE.Raycaster();
+    const mouseVec = new THREE.Vector2();
+
+    const R = (a, b) => a + Math.random() * (b - a);
+    const D = () => GAME_CONFIG.DIFF[store.settings.diff];
+
+    function applyTheme() {
+      if (store.settings.theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        if (scene) scene.background = new THREE.Color(0xf1e9f7);
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        if (scene) scene.background = new THREE.Color(0x140a22);
+      }
+    }
+
+    function renderUI() {
+      [['t-snd','snd'], ['t-vib','vib'], ['t-shk','shk']].forEach(([id, k]) => {
+        document.getElementById(id).setAttribute('aria-checked', store.settings[k]);
+      });
+
+      document.querySelectorAll('#s-diff button').forEach(b => {
+        b.setAttribute('aria-pressed', b.dataset.v === store.settings.diff);
+      });
+
+      document.querySelectorAll('#s-theme button').forEach(b => {
+        b.setAttribute('aria-pressed', b.dataset.v === store.settings.theme);
+      });
+
+      document.querySelectorAll('#mode-select-group button').forEach(b => {
+        b.classList.toggle('active', b.dataset.m === store.settings.mode);
+      });
+
+      bestScore = store.getBestScore();
+      document.getElementById('hud-meta').textContent = `Rekor ${bestScore} · ${D().n} · ${store.settings.mode.toUpperCase()}`;
+      document.getElementById('hud-score').textContent = score;
+
+      const livesBox = document.getElementById('hud-lives');
+      livesBox.innerHTML = '';
+      if (store.settings.mode === 'classic') {
+        livesBox.style.display = 'flex';
+        for (let i = 0; i < maxLives; i++) {
+          const heart = document.createElement('div');
+          heart.className = 'heart' + (i >= lives ? ' lost' : '');
+          livesBox.appendChild(heart);
+        }
+      } else {
+        livesBox.style.display = 'none';
+      }
+
+      const timerHud = document.getElementById('hud-timer');
+      if (store.settings.mode === 'zen') {
+        timerHud.style.display = 'block';
+        timerHud.textContent = `${Math.ceil(zenTimer)}s`;
+      } else {
+        timerHud.style.display = 'none';
+      }
+    }
+
+    function spawnEntity() {
+      const isZen = store.settings.mode === 'zen';
+      const isFrenzyMode = store.settings.mode === 'frenzy' || frenzyTimer > 0;
+      const count = isFrenzyMode ? Math.floor(R(3, 6)) : Math.floor(R(1, 3));
+
+      for (let i = 0; i < count; i++) {
+        const x = R(-4.5, 4.5);
+        const y = -6.5;
+        const z = R(-1, 1);
+
+        const vx = -x * R(0.25, 0.45);
+        const vy = R(11.5, 14.5) * D().s;
+        const vz = R(-0.5, 0.5);
+
+        let entityMesh;
+        const randVal = Math.random();
+        const bombProb = isZen ? 0 : Math.min(0.25, 0.08 + gameTime * 0.003) * D().b;
+
+        if (!isZen && randVal < bombProb) {
+          entityMesh = createBombMesh();
+        } else if (randVal > 0.90) {
+          const pTypes = [GAME_CONFIG.POWERUPS.FREEZE, GAME_CONFIG.POWERUPS.DOUBLE, GAME_CONFIG.POWERUPS.FRENZY];
+          const chosenP = pTypes[Math.floor(Math.random() * pTypes.length)];
+          entityMesh = createPowerUpMesh(chosenP);
+        } else {
+          const fruitDef = GAME_CONFIG.FRUITS[Math.floor(Math.random() * GAME_CONFIG.FRUITS.length)];
+          entityMesh = createFruitMesh(fruitDef);
+        }
+
+        entityMesh.position.set(x, y, z);
+        scene.add(entityMesh);
+
+        activeObjects.push({
+          mesh: entityMesh,
+          vel: new THREE.Vector3(vx, vy, vz),
+          rotVel: new THREE.Vector3(R(-3, 3), R(-3, 3), R(-3, 3))
+        });
+      }
+
+      spawnTimer = (isFrenzyMode ? R(0.4, 0.8) : R(1.0, 2.2)) * D().s;
+    }
+
+    function sliceEntity(obj) {
+      const mesh = obj.mesh;
+      const userData = mesh.userData;
+      scene.remove(mesh);
+      activeObjects.splice(activeObjects.indexOf(obj), 1);
+
+      if (userData.type === 'bomb') {
+        audioMgr.play('bomb', store.settings.snd);
+        if (store.settings.vib && navigator.vibrate) navigator.vibrate(250);
+
+        if (store.settings.shk) triggerCameraShake(0.6);
+        spawnParticles(mesh.position, 0xff5722, 30);
+
+        endGame(true);
+        return;
+      }
+
+      if (userData.type === 'powerup') {
+        audioMgr.play('powerup', store.settings.snd);
+        if (userData.powerType === GAME_CONFIG.POWERUPS.FREEZE) {
+          freezeTimer = 5;
+          showFloatingText(mesh.position, 'BEKU! ❄️', '#00e5ff');
+        } else if (userData.powerType === GAME_CONFIG.POWERUPS.DOUBLE) {
+          doubleTimer = 6;
+          showFloatingText(mesh.position, '2X POIN! ⭐', '#ffd700');
+        } else if (userData.powerType === GAME_CONFIG.POWERUPS.FRENZY) {
+          frenzyTimer = 5;
+          showFloatingText(mesh.position, 'FRENZY! 🍌', '#ff1744');
+        }
+        spawnParticles(mesh.position, 0xffffff, 20);
+        return;
+      }
+
+      comboHits++;
+      let points = comboHits * (doubleTimer > 0 ? 2 : 1);
+      score += points;
+
+      audioMgr.play('slice', store.settings.snd);
+      if (store.settings.vib && navigator.vibrate) navigator.vibrate(15);
+
+      const fDef = userData.fruitDef;
+      spawnParticles(mesh.position, fDef.innerColor, 22);
+
+      if (comboHits >= 3) {
+        showFloatingText(mesh.position, `Kombo +${points}`, '#ffd54a');
+      } else {
+        showFloatingText(mesh.position, `+${points}`, '#ffffff');
+      }
+
+      [-1, 1].forEach((dir, idx) => {
+        const halfMesh = createFruitHalfMesh(fDef, idx === 0 ? 'left' : 'right');
+        halfMesh.position.copy(mesh.position);
+        scene.add(halfMesh);
+
+        slicedHalves.push({
+          mesh: halfMesh,
+          vel: new THREE.Vector3(obj.vel.x * 0.4 + dir * 2.5, obj.vel.y * 0.3 + 2, obj.vel.z),
+          rotVel: new THREE.Vector3(R(-4, 4), R(-4, 4), R(-4, 4)),
+          life: 2.0
+        });
+      });
+
+      renderUI();
+    }
+
+    function triggerCameraShake(intensity) {
+      const origPos = new THREE.Vector3(0, 0, 14);
+      let t = 0;
+      const shakeInterval = setInterval(() => {
+        t += 0.05;
+        camera.position.set(
+          origPos.x + R(-intensity, intensity),
+          origPos.y + R(-intensity, intensity),
+          origPos.z
+        );
+        if (t >= 0.35) {
+          clearInterval(shakeInterval);
+          camera.position.copy(origPos);
+        }
+      }, 30);
+    }
+
+    function showFloatingText(worldPos, text, color) {
+      const vec = worldPos.clone().project(camera);
+      const x = (vec.x * 0.5 + 0.5) * container.clientWidth;
+      const y = (-(vec.y * 0.5) + 0.5) * container.clientHeight;
+
+      const el = document.createElement('div');
+      el.className = 'combo-text';
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      el.style.color = color;
+      el.textContent = text;
+
+      container.appendChild(el);
+      setTimeout(() => el.remove(), 800);
+    }
+
+    function clearSceneObjects() {
+      activeObjects.forEach(o => scene.remove(o.mesh));
+      slicedHalves.forEach(h => scene.remove(h.mesh));
+      particles.forEach(p => scene.remove(p.mesh));
+
+      activeObjects = [];
+      slicedHalves = [];
+      particles = [];
+    }
+
+    function startGame() {
+      clearSceneObjects();
+
+      score = 0;
+      lives = maxLives = D().l;
+      gameTime = 0;
+      spawnTimer = 0.5;
+      comboHits = 0;
+      zenTimer = 60;
+      freezeTimer = 0;
+      doubleTimer = 0;
+      frenzyTimer = 0;
+
+      gameState = 'play';
+      document.getElementById('ov').classList.add('hide');
+      document.getElementById('btn-home-ingame').style.display = 'flex';
+      renderUI();
+    }
+
+    function goHome() {
+      gameState = 'menu';
+      clearSceneObjects();
+
+      // Sembunyikan tombol in-game
+      document.getElementById('btn-home-ingame').style.display = 'none';
+      setModal.classList.add('hide');
+
+      // Tampilkan overlay menu utama
+      const titleEl = document.getElementById('ot');
+      const scoreEl = document.getElementById('osc');
+      const descEl = document.getElementById('os');
+
+      titleEl.textContent = 'Tebas Buah 3D';
+      scoreEl.textContent = '';
+      descEl.textContent = 'Potong buah 3D dengan pisau tajam! Hindari bom dan tebas power-up spesial!';
+
+      document.getElementById('go').textContent = 'Main 3D';
+      document.getElementById('ov').classList.remove('hide');
+      renderUI();
+    }
+
+    function endGame(hitBomb = false) {
+      gameState = 'over';
+      if (score > bestScore) {
+        bestScore = score;
+        store.setBestScore(bestScore);
+      }
+
+      document.getElementById('btn-home-ingame').style.display = 'none';
+
+      const titleEl = document.getElementById('ot');
+      const scoreEl = document.getElementById('osc');
+      const descEl = document.getElementById('os');
+
+      if (store.settings.mode === 'zen') {
+        titleEl.textContent = 'Waktu Habis!';
+      } else {
+        titleEl.textContent = hitBomb ? 'Kena Bom! 💣' : 'Buah Jatuh! 🍉';
+      }
+
+      scoreEl.textContent = score;
+      descEl.textContent = `Rekor kamu ${bestScore} (${store.settings.mode.toUpperCase()} - ${D().n}). Tekan Main Lagi untuk mencoba lagi!`;
+
+      document.getElementById('go').textContent = 'Main Lagi';
+      document.getElementById('ov').classList.remove('hide');
+      renderUI();
+    }
+
+    /* ==========================================================================
+       9. RAYCASTING & INTERAKSI PISAU 3D
+       ========================================================================== */
+    function get3DRayPosition(e) {
+      const rect = container.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      mouseVec.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      mouseVec.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouseVec, camera);
+      const targetZ = 0.5;
+      const distance = (targetZ - raycaster.ray.origin.z) / raycaster.ray.direction.z;
+      return raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(distance));
+    }
+
+    function handlePointerMove(e) {
+      const point3D = get3DRayPosition(e);
+
+      // Gerakkan Model Pisau 3D
+      if (knifeGroup) {
+        knifeGroup.position.copy(point3D);
+
+        if (lastRayPos) {
+          const dx = point3D.x - lastRayPos.x;
+          const dy = point3D.y - lastRayPos.y;
+          const dist = Math.hypot(dx, dy);
+
+          if (dist > 0.02) {
+            const angle = Math.atan2(dy, dx) - Math.PI / 2;
+            knifeGroup.rotation.z = angle;
+            knifeGroup.rotation.x = isPointerDown ? -0.4 : -0.1;
+          }
+        }
+      }
+
+      if (!isPointerDown) return;
+
+      bladeTrailPoints.push(point3D);
+      if (bladeTrailPoints.length > MAX_TRAIL) bladeTrailPoints.shift();
+
+      updateBladeMesh();
+
+      if (gameState === 'play' && lastRayPos) {
+        const meshesToTest = activeObjects.map(o => o.mesh);
+        const intersects = raycaster.intersectObjects(meshesToTest, true);
+
+        for (let hit of intersects) {
+          let rootGroup = hit.object;
+          while (rootGroup.parent && rootGroup.parent !== scene) {
+            rootGroup = rootGroup.parent;
+          }
+          const entity = activeObjects.find(o => o.mesh === rootGroup);
+          if (entity) {
+            sliceEntity(entity);
+            break;
+          }
+        }
+      }
+
+      lastRayPos = point3D;
+    }
+
+    container.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      isPointerDown = true;
+      comboHits = 0;
+      audioMgr.init();
+      bladeTrailPoints = [];
+      lastRayPos = get3DRayPosition(e);
+      bladeTrailPoints.push(lastRayPos);
+      if (knifeGroup) knifeGroup.rotation.x = -0.4;
+    });
+
+    container.addEventListener('pointermove', handlePointerMove);
+
+    window.addEventListener('pointerup', () => {
+      isPointerDown = false;
+      bladeTrailPoints = [];
+      lastRayPos = null;
+      updateBladeMesh();
+      if (knifeGroup) knifeGroup.rotation.x = -0.1;
+    });
+
+    /* ==========================================================================
+       10. MAIN GAME LOOP
+       ========================================================================== */
+    let lastTime = performance.now();
+
+    function animate(currentTime) {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min((currentTime - lastTime) / 1000, 0.08);
+      lastTime = currentTime;
+
+      if (gameState === 'play') {
+        gameTime += delta;
+
+        if (freezeTimer > 0) freezeTimer -= delta;
+        if (doubleTimer > 0) doubleTimer -= delta;
+        if (frenzyTimer > 0) frenzyTimer -= delta;
+
+        if (store.settings.mode === 'zen') {
+          zenTimer -= delta;
+          document.getElementById('hud-timer').textContent = `${Math.ceil(Math.max(0, zenTimer))}s`;
+          if (zenTimer <= 0) {
+            endGame(false);
+            return;
+          }
+        }
+
+        const effectiveGravity = freezeTimer > 0 ? -9.8 * 0.35 : -9.8;
+        const dt = freezeTimer > 0 ? delta * 0.35 : delta;
+
+        spawnTimer -= dt;
+        if (spawnTimer <= 0) spawnEntity();
+
+        for (let i = activeObjects.length - 1; i >= 0; i--) {
+          const obj = activeObjects[i];
+          const m = obj.mesh;
+
+          obj.vel.y += effectiveGravity * delta;
+          m.position.addScaledVector(obj.vel, delta);
+
+          m.rotation.x += obj.rotVel.x * delta;
+          m.rotation.y += obj.rotVel.y * delta;
+
+          if (obj.vel.y < 0 && m.position.y < -7.5) {
+            scene.remove(m);
+            activeObjects.splice(i, 1);
+
+            if (obj.mesh.userData.type === 'fruit' && store.settings.mode === 'classic') {
+              lives--;
+              audioMgr.play('miss', store.settings.snd);
+              renderUI();
+              if (lives <= 0) {
+                endGame(false);
+                return;
+              }
+            }
+          }
+        }
+
+        for (let i = slicedHalves.length - 1; i >= 0; i--) {
+          const h = slicedHalves[i];
+          h.vel.y += -12.0 * delta;
+          h.mesh.position.addScaledVector(h.vel, delta);
+          h.mesh.rotation.x += h.rotVel.x * delta;
+          h.mesh.rotation.y += h.rotVel.y * delta;
+          h.life -= delta;
+
+          if (h.mesh.position.y < -8.0 || h.life <= 0) {
+            scene.remove(h.mesh);
+            slicedHalves.splice(i, 1);
+          }
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.vel.y += -14.0 * delta;
+          p.mesh.position.addScaledVector(p.vel, delta);
+          p.life -= delta * 1.8;
+
+          if (p.life <= 0) {
+            scene.remove(p.mesh);
+            particles.splice(i, 1);
+          }
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    /* ==========================================================================
+       11. EVENT LISTENERS & UI
+       ========================================================================== */
+    const setModal = document.getElementById('set');
+    const openSet = () => {
+      if (gameState === 'play') gameState = 'paused';
+      renderUI();
+      setModal.classList.remove('hide');
+    };
+    const closeSet = () => {
+      setModal.classList.add('hide');
+      if (gameState === 'paused') gameState = 'play';
+    };
+
+    document.getElementById('gear').onclick = openSet;
+    document.getElementById('close').onclick = closeSet;
+
+    // Tombol Home In-Game & Pengaturan
+    document.getElementById('btn-home-ingame').onclick = goHome;
+    document.getElementById('btn-home-set').onclick = goHome;
+
+    [['t-snd','snd'], ['t-vib','vib'], ['t-shk','shk']].forEach(([id, k]) => {
+      document.getElementById(id).onclick = () => {
+        store.settings[k] = !store.settings[k];
+        store.saveSettings();
+        renderUI();
+        if (k === 'snd' && store.settings.snd) audioMgr.play('slice');
+      };
+    });
+
+    document.querySelectorAll('#s-diff button').forEach(b => {
+      b.onclick = () => {
+        if (gameState === 'paused') return;
+        store.settings.diff = b.dataset.v;
+        store.saveSettings();
+        renderUI();
+      };
+    });
+
+    document.querySelectorAll('#s-theme button').forEach(b => {
+      b.onclick = () => {
+        store.settings.theme = b.dataset.v;
+        store.saveSettings();
+        applyTheme();
+        renderUI();
+      };
+    });
+
+    document.querySelectorAll('#mode-select-group button').forEach(b => {
+      b.onclick = () => {
+        store.settings.mode = b.dataset.m;
+        store.saveSettings();
+        renderUI();
+      };
+    });
+
+    document.getElementById('go').onclick = startGame;
+    document.getElementById('rst').onclick = () => {
+      store.clearBestScore();
+      renderUI();
+    };
+
+    window.onload = () => {
+      init3D();
+      applyTheme();
+      renderUI();
+      requestAnimationFrame(animate);
+    };
+  </script>
+</body>
+</html>
